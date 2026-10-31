@@ -1,0 +1,77 @@
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - frontend/**
+    exclude:
+      - terraform/**
+      - backend/**
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    include:
+      - frontend/**
+
+pool:
+  vmImage: "ubuntu-latest"
+
+variables:
+  AWS_SERVICE_CONNECTION: "AWS-OIDC-ServiceConnection"
+  AWS_REGION: "us-east-1"
+  ECR_REPOSITORY: "totoro-frontend"
+
+stages:
+  - stage: Quality_And_Security
+    displayName: "Frontend Quality & Security Checks"
+    jobs:
+      - job: Node_Analysis
+        steps:
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "20.x"
+
+          - script: |
+              cd frontend
+              npm ci
+
+              echo "==> Running ESLint <=="
+              npm run lint
+
+              echo "==> Running npm audit <=="
+              npm audit --audit-level=high || true
+            displayName: "ESLint & NPM Audit"
+
+  - stage: Podman_Build_And_Push
+    displayName: "Podman Build & Push to ECR"
+    dependsOn: Quality_And_Security
+    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: BuildAndPush
+        steps:
+          - task: AWSShellScript@1
+            displayName: "Podman Login, Build & Push"
+            inputs:
+              awsCredentials: "$(AWS_SERVICE_CONNECTION)"
+              regionName: "$(AWS_REGION)"
+              scriptType: "inline"
+              inlineScript: |
+                # Retrieve Account ID dynamically via OIDC session
+                AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+                ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+                IMAGE_TAG="$(Build.BuildId)"
+
+                echo "==> Authenticating Podman to ECR <=="
+                aws ecr get-login-password --region $(AWS_REGION) | podman login --username AWS --password-stdin $ECR_REGISTRY
+
+                echo "==> Building Frontend Container Image <=="
+                cd frontend
+                podman build -t $ECR_REGISTRY/$(ECR_REPOSITORY):$IMAGE_TAG -t $ECR_REGISTRY/$(ECR_REPOSITORY):latest .
+
+                echo "==> Pushing Image to AWS ECR <=="
+                podman push $ECR_REGISTRY/$(ECR_REPOSITORY):$IMAGE_TAG
+                podman push $ECR_REGISTRY/$(ECR_REPOSITORY):latest

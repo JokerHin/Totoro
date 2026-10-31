@@ -1,7 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  /* Standalone output for Docker multi-stage builds */
+  output: "standalone",
+
+  /* Config options */
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

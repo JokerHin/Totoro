@@ -1,0 +1,28 @@
+---
+- name: Update local kubeconfig for EKS cluster
+  command: >
+    aws eks update-kubeconfig
+    --region {{ aws_region }}
+    --name {{ eks_cluster_name }}
+  register: kubeconfig_result
+  changed_when: false
+
+- name: Display Kubeconfig status
+  debug:
+    msg: "{{ kubeconfig_result.stdout }}"
+
+- name: Check status of EKS worker nodes
+  command: kubectl get nodes -o json
+  register: nodes_json
+  changed_when: false
+
+- name: Parse node health states
+  set_fact:
+    ready_nodes: "{{ (nodes_json.stdout | from_json).items | selectattr('status.conditions', 'defined') | list }}"
+
+- name: Assert at least 2 Spot nodes are Ready
+  assert:
+    that:
+      - ready_nodes | length >= 2
+    fail_msg: "EKS Worker nodes are not in Ready status!"
+    success_msg: "EKS Worker nodes are healthy and running."

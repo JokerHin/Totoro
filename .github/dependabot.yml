@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Check Python backend dependencies weekly
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+
+  # Check Next.js frontend dependencies weekly
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+
+  # Check Terraform provider modules weekly
+  - package-ecosystem: "terraform"
+    directory: "/terraform"
+    schedule:
+      interval: "weekly"

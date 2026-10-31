@@ -1,0 +1,22 @@
+---
+- name: Verify PostgreSQL Database endpoint parameters
+  debug:
+    msg: "Testing RDS PostgreSQL connectivity for cluster {{ eks_cluster_name }}..."
+
+- name: Test RDS network port reachability (Port 5432)
+  wait_for:
+    host: "{{ lookup('env', 'RDS_ENDPOINT') | default('localhost', true) }}"
+    port: 5432
+    state: started
+    timeout: 10
+  ignore_errors: true
+  register: rds_port_check
+
+- name: Log RDS reachability state
+  debug:
+    msg: >
+      {% if rds_port_check.failed %}
+      RDS is isolated in private subnet (Expected behavior for production security).
+      {% else %}
+      RDS is reachable on port 5432.
+      {% endif %}

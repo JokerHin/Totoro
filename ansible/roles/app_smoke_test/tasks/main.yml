@@ -1,0 +1,22 @@
+---
+- name: Check Kubernetes pod deployment statuses
+  command: kubectl get pods -n default -o json
+  register: pods_json
+  changed_when: false
+
+- name: Verify total running pods
+  vars:
+    running_pods: "{{ (pods_json.stdout | from_json).items | selectattr('status.phase', 'equalto', 'Running') | list }}"
+  debug:
+    msg: "Currently active running pods in EKS: {{ running_pods | length }}"
+
+- name: Retrieve Ingress Load Balancer URL
+  command: kubectl get ingress totoro-ingress -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+  register: alb_hostname
+  failed_when: false
+  changed_when: false
+
+- name: Display ALB Endpoint URL
+  debug:
+    msg: "Application Load Balancer URL: http://{{ alb_hostname.stdout }}"
+  when: alb_hostname.stdout != ""

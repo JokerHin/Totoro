@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: totoro-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: totoro-frontend
+  template:
+    metadata:
+      labels:
+        app: totoro-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: 112613577929.dkr.ecr.us-east-1.amazonaws.com/totoro-frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://totoro-backend-service:8000"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: totoro-frontend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: totoro-frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
