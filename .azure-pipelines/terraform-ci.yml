@@ -25,83 +25,204 @@ variables:
   AWS_REGION: "us-east-1"
 
 stages:
+  # ==========================================
+  # STAGE 1: TERRAFORM VALIDATE & PLAN
+  # ==========================================
+
   - stage: Terraform_Validate_And_Plan
     displayName: "Validate & Plan Infrastructure"
+
     jobs:
       - job: Plan
+        displayName: "Terraform Plan"
+
         steps:
+          # Checkout Repository
+          - checkout: self
+
+          # Install Terraform
           - script: |
-              set -e
-              echo "==> Installing Terraform via HashiCorp repository <=="
+              set -euo pipefail
+
+              echo "==> Installing Terraform <=="
+
               sudo apt-get update -y
               sudo apt-get install -y gnupg software-properties-common curl
-              curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-              sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main" -y
-              sudo apt-get update -y && sudo apt-get install terraform -y
+
+              curl -fsSL https://apt.releases.hashicorp.com/gpg \
+                | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+              echo "deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+                | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+              sudo apt-get update -y
+              sudo apt-get install -y terraform
+
               terraform --version
+
             displayName: "Install Terraform"
 
+          # Terraform Format Check
           - script: |
+              set -euo pipefail
+
               cd terraform
-              echo "==> Checking Formatting <=="
-              terraform fmt -check
+
+              echo "==> Checking Terraform Formatting <=="
+
+              terraform fmt -check -recursive
+
             displayName: "Terraform Format Check"
 
+          # Terraform Init, Validate & Plan
           - task: AWSShellScript@1
             displayName: "Terraform Init & Plan"
+
             inputs:
               awsCredentials: "$(AWS_SERVICE_CONNECTION)"
               regionName: "$(AWS_REGION)"
               scriptType: "inline"
-              inlineScript: |
-                cd terraform
-                terraform init -upgrade
-                terraform validate
-                terraform plan -out=tfplan
 
+              inlineScript: |
+                set -euo pipefail
+
+                cd terraform
+
+                echo "==> Terraform Initialization <=="
+
+                terraform init -input=false
+
+                echo "==> Terraform Validation <=="
+
+                terraform validate
+
+                echo "==> Terraform Planning <=="
+
+                terraform plan \
+                  -input=false \
+                  -lock-timeout=5m \
+                  -out=tfplan
+
+                echo "==> Terraform Plan Completed <=="
+
+          # Checkov Security Scan
           - script: |
-              pip install checkov
-              checkov -d terraform/ --framework terraform --soft-fail
+              set -euo pipefail
+
+              echo "==> Creating Python Virtual Environment <=="
+
+              python3 -m venv .venv-checkov
+
+              echo "==> Installing Checkov <=="
+
+              .venv-checkov/bin/pip install --upgrade pip
+              .venv-checkov/bin/pip install checkov
+
+              echo "==> Running Terraform Security Scan <=="
+
+              .venv-checkov/bin/checkov \
+                -d terraform/ \
+                --framework terraform \
+                --soft-fail
+
             displayName: "Checkov Security Scan"
 
+          # Publish Terraform Plan
           - publish: terraform/tfplan
             artifact: terraform-plan
+            displayName: "Publish Terraform Plan"
+
+  # ==========================================
+  # STAGE 2: TERRAFORM APPLY
+  # ==========================================
 
   - stage: Terraform_Apply
     displayName: "Apply Infrastructure Changes"
+
     dependsOn: Terraform_Validate_And_Plan
-    condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+
+    condition: and(
+      succeeded(),
+      eq(variables['Build.SourceBranch'], 'refs/heads/main')
+      )
+
     jobs:
       - deployment: Apply
+        displayName: "Deploy AWS Infrastructure"
+
         environment: "AWS-Production-Infrastructure"
+
         strategy:
           runOnce:
             deploy:
               steps:
+                # Checkout Repository
                 - checkout: self
 
-                - script: |
-                    set -e
-                    echo "==> Installing Terraform via HashiCorp repository <=="
-                    sudo apt-get update -y
-                    sudo apt-get install -y gnupg software-properties-common curl
-                    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-                    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main" -y
-                    sudo apt-get update -y && sudo apt-get install terraform -y
-                    terraform --version
-                  displayName: "Install Terraform"
-
+                # Download Terraform Plan
                 - download: current
                   artifact: terraform-plan
 
+                # Install Terraform
+                - script: |
+                    set -euo pipefail
+
+                    echo "==> Installing Terraform <=="
+
+                    sudo apt-get update -y
+                    sudo apt-get install -y gnupg software-properties-common curl
+
+                    curl -fsSL https://apt.releases.hashicorp.com/gpg \
+                      | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+
+                    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(. /etc/os-release && echo "$VERSION_CODENAME") main" \
+                      | sudo tee /etc/apt/sources.list.d/hashicorp.list
+
+                    sudo apt-get update -y
+                    sudo apt-get install -y terraform
+
+                    terraform --version
+
+                  displayName: "Install Terraform"
+
+                # Terraform Apply
                 - task: AWSShellScript@1
-                  displayName: "Terraform Apply"
+                  displayName: "Terraform Initialize & Apply"
+
                   inputs:
                     awsCredentials: "$(AWS_SERVICE_CONNECTION)"
                     regionName: "$(AWS_REGION)"
                     scriptType: "inline"
+
                     inlineScript: |
+                      set -euo pipefail
+
                       cd terraform
-                      terraform init -upgrade
-                      cp $(Pipeline.Workspace)/terraform-plan/tfplan .
-                      terraform apply -auto-approve tfplan
+
+                      echo "==> Cleaning Terraform Cache <=="
+
+                      rm -rf .terraform
+
+                      echo "==> Initializing Terraform <=="
+
+                      terraform init \
+                        -input=false \
+                        -lockfile=readonly
+
+                      echo "==> Checking Terraform Providers <=="
+
+                      terraform providers
+
+                      echo "==> Retrieving Terraform Plan <=="
+
+                      cp "$(Pipeline.Workspace)/terraform-plan/tfplan" ./tfplan
+
+                      echo "==> Applying Infrastructure Changes <=="
+
+                      terraform apply \
+                        -input=false \
+                        -lock-timeout=5m \
+                        -auto-approve \
+                        tfplan
+
+                      echo "==> Infrastructure Deployment Successful <=="
