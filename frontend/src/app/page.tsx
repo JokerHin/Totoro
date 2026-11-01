@@ -5,6 +5,11 @@ import axios from "axios";
 import ForceGraphCanvas from "@/components/ForceGraphCanvas";
 import NodeInspector from "@/components/NodeInspector";
 
+// Fallback to environment variable or relative origin for same-domain ALB routing
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  (typeof window !== "undefined" ? window.location.origin : "");
+
 export default function TotoroDashboard() {
   const [nodes, setNodes] = useState<any[]>([]);
   const [links, setLinks] = useState<any[]>([]);
@@ -54,7 +59,7 @@ export default function TotoroDashboard() {
 
     try {
       const res = await axios.post(
-        "http://localhost:8000/api/v1/extract-graph",
+        `${API_BASE_URL}/api/v1/extract-graph`,
         formData,
       );
       const rawNodes = res.data.nodes || [];

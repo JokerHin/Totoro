@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: totoro-frontend
+  namespace: default
+  labels:
+    app: totoro-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: totoro-frontend
+  template:
+    metadata:
+      labels:
+        app: totoro-frontend
+    spec:
+      containers:
+        - name: totoro-frontend
+          image: 112613577929.dkr.ecr.us-east-1.amazonaws.com/totoro-frontend:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: NEXT_PUBLIC_API_URL
+              value: "http://k8s-default-totoroin-a541c4124e-1576574714.us-east-1.elb.amazonaws.com"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: totoro-frontend-service
+  namespace: default
+  labels:
+    app: totoro-frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: totoro-frontend
