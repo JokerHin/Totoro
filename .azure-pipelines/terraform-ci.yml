@@ -21,7 +21,6 @@ pool:
   vmImage: "ubuntu-latest"
 
 variables:
-  # Name of your Azure DevOps Service Connection configured with AWS OIDC
   AWS_SERVICE_CONNECTION: "AWS-OIDC-ServiceConnection"
   AWS_REGION: "us-east-1"
 
@@ -31,10 +30,6 @@ stages:
     jobs:
       - job: Plan
         steps:
-          - task: HashiCorpTerraformInstaller@1
-            inputs:
-              terraformVersion: "latest"
-
           - script: |
               cd terraform
               echo "==> Checking Formatting <=="
@@ -54,32 +49,25 @@ stages:
                 terraform plan -out=tfplan
 
           - script: |
-              # Run security static analysis on terraform code
               pip install checkov
               checkov -d terraform/ --framework terraform --soft-fail
             displayName: "Checkov Security Scan"
 
-          # Publish plan artifact so it can be reviewed before apply
           - publish: terraform/tfplan
             artifact: terraform-plan
 
   - stage: Terraform_Apply
     displayName: "Apply Infrastructure Changes"
     dependsOn: Terraform_Validate_And_Plan
-    # Require main branch and manual approval trigger if using Azure Environments
     condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
     jobs:
       - deployment: Apply
-        environment: "AWS-Production-Infrastructure" # Set up approval checks on this Environment in Azure DevOps
+        environment: "AWS-Production-Infrastructure"
         strategy:
           runOnce:
             deploy:
               steps:
                 - checkout: self
-
-                - task: HashiCorpTerraformInstaller@1
-                  inputs:
-                    terraformVersion: "latest"
 
                 - download: current
                   artifact: terraform-plan
