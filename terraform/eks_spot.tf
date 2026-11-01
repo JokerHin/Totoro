@@ -2,9 +2,8 @@ module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   version         = "~> 20.0"
   cluster_name    = "totoro-eks-cluster"
-  cluster_version = "1.30"
+  cluster_version = "1.31"
 
-  # Pass the private subnet IDs directly from the VPC module output
   vpc_id     = module.vpc.vpc_id
   subnet_ids = module.vpc.private_subnets
 
@@ -26,10 +25,19 @@ module "eks" {
   }
 }
 
-# IAM policy allowing EKS pods to read Secrets Manager resources
+# 1. Fetch existing manual secrets by name
+data "aws_secretsmanager_secret" "groq_api_key" {
+  name = "totoro/groq-api-key"
+}
+
+data "aws_secretsmanager_secret" "db_credentials" {
+  name = "totoro/db-credentials"
+}
+
+# 2. Reference data sources in IAM policy
 resource "aws_iam_policy" "secrets_read_policy" {
-  name        = "totoro-eks-secrets-read"
-  description = "Allow EKS pods to retrieve secrets from AWS Secrets Manager"
+  name        = "totoro-eks-secrets-read-policy"
+  description = "Allows EKS workloads to read Secrets Manager secrets"
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -41,14 +49,14 @@ resource "aws_iam_policy" "secrets_read_policy" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          aws_secretsmanager_secret.groq_api_key.arn,
-          aws_secretsmanager_secret.db_credentials.arn
+          data.aws_secretsmanager_secret.groq_api_key.arn,
+          data.aws_secretsmanager_secret.db_credentials.arn
         ]
       },
       {
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
-        Resource = [aws_kms_key.totoro_key.arn]
+        Resource = "*"
       }
     ]
   })
