@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: totoro-backend
+  namespace: default
+  labels:
+    app: totoro-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: totoro-backend
+  template:
+    metadata:
+      labels:
+        app: totoro-backend
+    spec:
+      containers:
+        - name: totoro-backend
+          image: 112613577929.dkr.ecr.us-east-1.amazonaws.com/totoro-backend:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DB_HOST
+              value: "totoro-db-service"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: totoro-backend-service
+  namespace: default
+  labels:
+    app: totoro-backend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+      protocol: TCP
+  selector:
+    app: totoro-backend
