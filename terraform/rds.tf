@@ -2,6 +2,10 @@
 resource "aws_db_subnet_group" "totoro_db_subnets" {
   name       = "totoro-db-subnets"
   subnet_ids = module.vpc.private_subnets
+
+  tags = {
+    Name = "totoro-db-subnets"
+  }
 }
 
 # DB Security Group
@@ -23,23 +27,32 @@ resource "aws_security_group" "rds_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  tags = {
+    Name = "totoro-rds-sg"
+  }
 }
 
 # RDS PostgreSQL Instance
 resource "aws_db_instance" "totoro_rds" {
-  identifier          = "totoro-db"
-  engine              = "postgres"
-  engine_version      = "15.4"
-  instance_class      = "db.t3.micro"
-  allocated_storage   = 20
-  
-  db_name             = "totorodb"
-  username            = "totoro_admin"
+  identifier        = "totoro-db"
+  engine            = "postgres"
+  engine_version    = "15.4"
+  instance_class    = "db.t3.micro"
+  allocated_storage = 20
+
+  db_name  = "totorodb"
+  username = "totoro_admin"
 
   # AWS automatically creates a random password in Secrets Manager
   manage_master_user_password = true
-  
+
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   db_subnet_group_name   = aws_db_subnet_group.totoro_db_subnets.name
   skip_final_snapshot    = true
+
+  tags = {
+    Environment = "production"
+    Project     = "Totoro"
+  }
 }
