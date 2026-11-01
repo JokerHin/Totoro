@@ -1,6 +1,6 @@
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "19.15.3"
+  version = "~> 20.0"
 
   cluster_name    = "totoro-eks-cluster"
   cluster_version = "1.28"
