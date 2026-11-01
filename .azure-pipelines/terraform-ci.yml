@@ -23,6 +23,7 @@ pool:
 variables:
   AWS_SERVICE_CONNECTION: "AWS-OIDC-ServiceConnection"
   AWS_REGION: "us-east-1"
+  TERRAFORM_VERSION: "1.6.6"
 
 stages:
   - stage: Terraform_Validate_And_Plan
@@ -30,6 +31,15 @@ stages:
     jobs:
       - job: Plan
         steps:
+          # Install Terraform binary on the agent
+          - script: |
+              sudo apt-get update && sudo apt-get install -y wget unzip
+              wget https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_linux_amd64.zip
+              unzip terraform_$(TERRAFORM_VERSION)_linux_amd64.zip
+              sudo mv terraform /usr/local/bin/
+              terraform --version
+            displayName: "Install Terraform"
+
           - script: |
               cd terraform
               echo "==> Checking Formatting <=="
@@ -68,6 +78,15 @@ stages:
             deploy:
               steps:
                 - checkout: self
+
+                # Install Terraform binary on the deployment agent
+                - script: |
+                    sudo apt-get update && sudo apt-get install -y wget unzip
+                    wget https://releases.hashicorp.com/terraform/$(TERRAFORM_VERSION)/terraform_$(TERRAFORM_VERSION)_linux_amd64.zip
+                    unzip terraform_$(TERRAFORM_VERSION)_linux_amd64.zip
+                    sudo mv terraform /usr/local/bin/
+                    terraform --version
+                  displayName: "Install Terraform"
 
                 - download: current
                   artifact: terraform-plan
