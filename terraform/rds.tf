@@ -27,15 +27,19 @@ resource "aws_security_group" "rds_sg" {
 
 # RDS PostgreSQL Instance
 resource "aws_db_instance" "totoro_rds" {
-  identifier             = "totoro-db"
-  allocated_storage      = 20
-  engine                 = "postgres"
-  engine_version         = "15"
-  instance_class         = "db.t4g.micro"
-  db_name                = "totorodb"
-  username               = "totoro_admin"
-  password               = var.db_password
-  db_subnet_group_name   = aws_db_subnet_group.totoro_db_subnets.name
+  identifier          = "totoro-db"
+  engine              = "postgres"
+  engine_version      = "15.4"
+  instance_class      = "db.t3.micro"
+  allocated_storage   = 20
+  
+  db_name             = "totorodb"
+  username            = "totoro_admin"
+
+  # AWS automatically creates a random password in Secrets Manager!
+  manage_master_user_password = true
+  
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
+  db_subnet_group_name   = aws_db_subnet_group.totoro_db_subnet_group.name
   skip_final_snapshot    = true
 }
