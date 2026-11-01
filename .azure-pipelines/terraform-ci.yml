@@ -55,7 +55,7 @@ stages:
               scriptType: "inline"
               inlineScript: |
                 cd terraform
-                terraform init
+                terraform init -upgrade
                 terraform validate
                 terraform plan -out=tfplan
 
@@ -102,6 +102,6 @@ stages:
                     scriptType: "inline"
                     inlineScript: |
                       cd terraform
-                      terraform init
+                      terraform init -upgrade
                       cp $(Pipeline.Workspace)/terraform-plan/tfplan .
                       terraform apply -auto-approve tfplan
