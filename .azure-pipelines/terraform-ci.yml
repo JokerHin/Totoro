@@ -207,7 +207,6 @@ stages:
 
                       terraform init \
                         -input=false \
-                        -lockfile=readonly
 
                       echo "==> Checking Terraform Providers <=="
 
