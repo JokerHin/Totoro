@@ -15,6 +15,17 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async rewrites() {
+    // In local dev, proxy /api to FastAPI running on port 8000
+    // In production behind ALB, ALB routes /api directly before reaching Next.js
+    const backendUrl = process.env.BACKEND_URL || "http://127.0.0.1:8000";
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${backendUrl}/api/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

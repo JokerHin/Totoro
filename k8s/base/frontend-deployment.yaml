@@ -18,24 +18,22 @@ spec:
       containers:
         - name: totoro-frontend
           image: 112613577929.dkr.ecr.us-east-1.amazonaws.com/totoro-frontend:latest
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
           env:
             - name: NEXT_PUBLIC_API_URL
-              value: "http://k8s-default-totoroin-a541c4124e-1576574714.us-east-1.elb.amazonaws.com"
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: totoro-frontend-service
-  namespace: default
-  labels:
-    app: totoro-frontend
-spec:
-  type: ClusterIP
-  ports:
-    - port: 3000
-      targetPort: 3000
-      protocol: TCP
-  selector:
-    app: totoro-frontend
+              value: ""
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"

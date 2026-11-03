@@ -25,16 +25,29 @@ module "eks" {
   }
 }
 
-# 1. Fetch existing manual secrets by name
-data "aws_secretsmanager_secret" "groq_api_key" {
-  name = "totoro/groq-api-key"
+# 1. Groq API Key Secret in Secrets Manager
+resource "aws_secretsmanager_secret" "groq_api_key" {
+  name                    = "totoro/groq-api-key"
+  recovery_window_in_days = 0
+
+  tags = {
+    Environment = "production"
+    Project     = "Totoro"
+  }
 }
 
-data "aws_secretsmanager_secret" "db_credentials" {
-  name = "totoro/db-credentials"
+resource "aws_secretsmanager_secret_version" "groq_api_key_version" {
+  secret_id = aws_secretsmanager_secret.groq_api_key.id
+  secret_string = jsonencode({
+    GROQ_API_KEY = "dummy_or_provisioned_groq_api_key"
+  })
+
+  lifecycle {
+    ignore_changes = [secret_string]
+  }
 }
 
-# 2. Reference data sources in IAM policy
+# 2. Reference secrets in IAM policy for IRSA / EKS pods
 resource "aws_iam_policy" "secrets_read_policy" {
   name        = "totoro-eks-secrets-read-policy"
   description = "Allows EKS workloads to read Secrets Manager secrets"
@@ -49,8 +62,8 @@ resource "aws_iam_policy" "secrets_read_policy" {
           "secretsmanager:DescribeSecret"
         ]
         Resource = [
-          data.aws_secretsmanager_secret.groq_api_key.arn,
-          data.aws_secretsmanager_secret.db_credentials.arn
+          aws_secretsmanager_secret.groq_api_key.arn,
+          aws_secretsmanager_secret.db_credentials.arn
         ]
       },
       {

@@ -43,9 +43,7 @@ resource "aws_db_instance" "totoro_rds" {
 
   db_name  = "totorodb"
   username = "totoro_admin"
-
-  # AWS automatically creates a random password in Secrets Manager
-  manage_master_user_password = true
+  password = var.db_password
 
   vpc_security_group_ids = [aws_security_group.rds_sg.id]
   db_subnet_group_name   = aws_db_subnet_group.totoro_db_subnets.name
@@ -55,4 +53,28 @@ resource "aws_db_instance" "totoro_rds" {
     Environment = "production"
     Project     = "Totoro"
   }
+}
+
+# AWS Secrets Manager Secret for RDS Credentials
+resource "aws_secretsmanager_secret" "db_credentials" {
+  name                    = "totoro/db-credentials"
+  recovery_window_in_days = 0
+
+  tags = {
+    Environment = "production"
+    Project     = "Totoro"
+  }
+}
+
+resource "aws_secretsmanager_secret_version" "db_credentials_version" {
+  secret_id = aws_secretsmanager_secret.db_credentials.id
+  secret_string = jsonencode({
+    engine       = "postgres"
+    host         = aws_db_instance.totoro_rds.address
+    port         = 5432
+    username     = aws_db_instance.totoro_rds.username
+    password     = var.db_password
+    dbname       = aws_db_instance.totoro_rds.db_name
+    DATABASE_URL = "postgresql://${aws_db_instance.totoro_rds.username}:${var.db_password}@${aws_db_instance.totoro_rds.address}:5432/${aws_db_instance.totoro_rds.db_name}"
+  })
 }

@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: totoro-backend
+  namespace: default
+  labels:
+    app: totoro-backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: totoro-backend
+  template:
+    metadata:
+      labels:
+        app: totoro-backend
+    spec:
+      containers:
+        - name: totoro-backend
+          image: 112613577929.dkr.ecr.us-east-1.amazonaws.com/totoro-backend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DB_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: host
+                  optional: true
+            - name: DB_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: port
+                  optional: true
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: username
+                  optional: true
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: password
+                  optional: true
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: dbname
+                  optional: true
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: DATABASE_URL
+                  optional: true
+            - name: GROQ_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: rds-db-credentials
+                  key: GROQ_API_KEY
+                  optional: true
+          readinessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/v1/health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
